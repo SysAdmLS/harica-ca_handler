@@ -17,6 +17,7 @@ class CAhandler(object):
         self.allowed_domainlist = []
         self.eab_handler = None
         self.eab_profiling = False
+        self.harica_client = None
         self.header_info_field = False
         self.requester_email = None
         self.requester_password = None
@@ -43,7 +44,7 @@ class CAhandler(object):
         for domain in sans:
             if not self._is_domain_whitelisted(domain, self.allowed_domainlist):
                 invalid_domains.append(domain)
-                error = 'Either CN or SANs are not allowed by the configuration'
+                error = 'Either CN or SANs are not allowed by configuration'
 
         self.logger.debug(f'CAhandler._allowed_domainlist_check() ended with {error} for {",".join(invalid_domains)}')
         return error
@@ -122,6 +123,7 @@ class CAhandler(object):
                 except Exception as err:
                     self.logger.error('CAhandler._config_load(): failed to parse allowed_domainlist: %s', err)
 
+        self.harica_client = config_dic['CAhandler'].get('harica_client', None)
         self.requester_email = config_dic['CAhandler'].get('requester_email', None)
         self.requester_password = config_dic['CAhandler'].get('requester_password', None)
         self.requester_totp_seed = config_dic['CAhandler'].get('requester_totp_seed', None)
@@ -188,16 +190,35 @@ class CAhandler(object):
         if not error:
             if sans:
                 try:
+                    # Build the command to run the harica client dynamically
+                    command = [self.harica_client, "gen-cert", "--domains", sans]
+
+                    # Add optional parameters based on config
+                    if self.requester_email:
+                        command.extend(["--requester-email", self.requester_email])
+                    if self.requester_password:
+                        command.extend(["--requester-password", self.requester_password])
+                    if self.requester_totp_seed:
+                        command.extend(["--requester-totp-seed", self.requester_totp_seed])
+                    if self.validator_email:
+                        command.extend(["--validator-email", self.validator_email])
+                    if self.validator_password:
+                        command.extend(["--validator-password", self.validator_password])
+                    if self.validator_totp_seed:
+                        command.extend(["--validator-totp-seed", self.validator_totp_seed])
+
+                    # Add CSR
+                    command.extend(["--csr", csr_fix])
+
+
                     # Run the Go tool and capture output
                     result = subprocess.run(
-                        ["/var/www/acme2certifier/harica", "gen-cert", "--domains", sans,
-                         "--requester-email", self.requester_email, "--requester-password", self.requester_password,
-                         "--validator-email", self.validator_email, "--validator-password", self.validator_password,
-                         "--validator-totp-seed", self.validator_totp_seed, "--csr", csr_fix],
+                        command,
                         capture_output=True,
                         text=True,
                         check=True,
                     )
+
 
                     single_cert_pem, cert_bundle = self._extract_certificates(result.stdout)
                     cert_raw = b64_encode(self.logger, cert_pem2der(single_cert_pem))

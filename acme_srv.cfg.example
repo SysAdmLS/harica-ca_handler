@@ -9,6 +9,7 @@ nonce_check_disable: False
 # CA specific options
 allowed_domainlist = ["example.de","*.example.de"]
 eab_profiling = False
+harica_client = /var/www/acme2certifier/harica
 requester_email = email@example.de
 requester_password = Password
 requester_totp_seed = Seedphrase
