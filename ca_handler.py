@@ -17,6 +17,7 @@ class CAhandler(object):
         self.allowed_domainlist = []
         self.eab_handler = None
         self.eab_profiling = False
+        self.deactivated = False
         self.harica_client = None
         self.header_info_field = False
         self.requester_email = None
@@ -180,12 +181,18 @@ class CAhandler(object):
 
         sans = self._extract_domains(csr_san_get(self.logger, csr))
         sans_list = sans.split(',')
+        # check CA allowed domain list check before checking eab profiles afterwards
         error = self._allowed_domainlist_check(sans_list)
 
         csr_fix = f'-----BEGIN CERTIFICATE REQUEST-----\n{csr}\n-----END CERTIFICATE REQUEST-----\n'
 
         if not error:
             error = eab_profile_header_info_check(self.logger, self, csr, 'template_name')
+
+        # this checks for deactivation of the ca or eab accounts/profiles
+        if self.deactivated == 'True':
+            error = 'Account or CA is deactivated.'
+            return (error, cert_bundle, cert_raw, poll_indentifier)
 
         if not error:
             if sans:
