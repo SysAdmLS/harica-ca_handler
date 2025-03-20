@@ -151,8 +151,7 @@ class CAhandler(object):
             return None, None
 
         single_cert = cert_pattern[0]  # The first certificate (end-entity)
-        full_chain = "\n".join(cert_pattern)  # The full chain
-
+        full_chain = "\n".join(cert_pattern) + "\n"  # The full chain, important to add a newline at the end https://github.com/certbot/certbot/issues/9775
         return single_cert, full_chain
 
     def _extract_domains(self, sans_list: List[str]) -> str:
