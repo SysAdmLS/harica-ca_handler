@@ -32,3 +32,4 @@ challenge_validation_disable: False
 
 [Order]
 tnauthlist_support: False
+identifier_limit: 100
