@@ -169,6 +169,29 @@ class CAhandler(object):
                 domains.append(san[4:])  # Extract the part after "DNS:"
         return ",".join(domains)
 
+    def _remove_wildcard_base_domains(self, domains: List[str]) -> str:
+        """
+        Remove base domains from the list if their wildcard version exists.
+
+        Args:
+            domains: List of domain strings
+
+        Returns:
+            Comma separated string of domains with base domains removed when wildcards exist
+        """
+        # Find all wildcard domains and extract their base domains
+        wildcard_bases = set()
+        for domain in domains:
+            if domain.startswith('*.'):
+                # Extract base domain by removing '*.'' prefix
+                base = domain[2:]
+                wildcard_bases.add(base)
+
+        # Filter the list: keep domains that are NOT exact matches of wildcard bases
+        result = [d for d in domains if not (d in wildcard_bases and not d.startswith('*.'))]
+
+        return ','.join(result)
+
     def enroll(self, csr: str) -> Tuple[str, str, str, str]:
         """ enroll certificate  """
         self.logger.debug('CAhandler.enroll()')
@@ -183,6 +206,7 @@ class CAhandler(object):
         # check CA allowed domain list check before checking eab profiles afterwards
         error = self._allowed_domainlist_check(sans_list)
 
+
         csr_fix = f'-----BEGIN CERTIFICATE REQUEST-----\n{csr}\n-----END CERTIFICATE REQUEST-----\n'
 
         if not error:
@@ -195,6 +219,9 @@ class CAhandler(object):
 
         if not error:
             if sans:
+                # filter out basedomains for wildcard domains because harica api doesn't accept both together but acme clients might include them when renewing
+                # harica automatically adds the basedomains to the cert if a wildcard is requested
+                sans = self._remove_wildcard_base_domains(sans_list)
                 try:
                     # Build the command to run the harica client dynamically
                     command = [self.harica_client, "gen-cert", "--domains", sans]
